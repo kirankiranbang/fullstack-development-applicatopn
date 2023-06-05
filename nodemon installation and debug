@@ -236,4 +236,4 @@ in main app , my main application is app.js
 
 var cors = require('cors')
 app.use(cors())
- ///
+ /

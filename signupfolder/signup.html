@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Signup Form</title>
+  <style>
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-actions {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Signup Form</h1>
+  <form id="signup-form">
+    <label for="username">Username:</label>
+    <input type="text" id="username" name="username" required>
+    
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" required>
+    
+    <label for="phoneNumber">Phone Number:</label>
+    <input type="text" id="phoneNumber" name="phoneNumber" required>
+    
+    <button type="submit">Sign Up</button>
+  </form>
+  
+  <div id="output"></div>
+  //if u block div tag will not display on data after submiting button  //
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
+  <script>
+    async function fetchData() {
+  try {
+    const response = await axios.get('http://localhost:4000/signup-data');
+    const data = response.data;
+
+    console.log('Received data from the server:', data);
+
+    var output = '';
+    data.forEach((entry, index) => {
+      output += `
+        <div class="card">
+          <div class="card-content">
+            <h3>Username: ${entry.username}</h3>
+            <p>Password: ${entry.password}</p>
+            <p>Phone Number: ${entry.phoneNumber}</p>
+          </div>
+          <div class="card-actions">
+            <button class="edit-button" onclick="editData(${entry.id})">Edit</button>
+            <button class="delete-button" onclick="deleteData(${entry.id})">Delete</button>
+          </div>
+        </div>
+        <br>
+      `;
+    });
+
+    document.getElementById('output').innerHTML = output;
+  } catch (error) {
+    console.error('Error fetching data:', error);
+  }
+}
+
+document.getElementById('signup-form').addEventListener('submit', signupData);
+
+async function signupData(event) {
+  event.preventDefault(); // Prevent form submission
+
+  try {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const phoneNumber = document.getElementById('phoneNumber').value;
+
+    const newUser = {
+      username: username,
+      password: password,
+      phoneNumber: phoneNumber
+    };
+
+    const response = await axios.post('http://localhost:4000/signup', newUser);
+    const responseData = response.data;
+
+    console.log('Received response:', responseData);
+
+    // Clear form fields after successful submission
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    document.getElementById('phoneNumber').value = '';
+
+    await fetchData(); // Fetch and display the updated data
+  } catch (error) {
+    console.error('Error signing up:', error);
+  }
+}
+async function deleteData(id) {
+  try {
+    // Send a DELETE request to the server for the specified user ID
+    await axios.delete(`http://localhost:4000/signup/${id}`);
+
+    // Fetch and display the updated data
+    await fetchData();
+  } catch (error) {
+    console.error('Error deleting data:', error);
+  }
+}
+
+async function editData(id) {
+  try {
+    const username = prompt('Enter the new username:');
+    const password = prompt('Enter the new password:');
+    const phoneNumber = prompt('Enter the new phone number:');
+
+    // Create an object with the updated user data
+    const updatedUser = {
+      username: username,
+      password: password,
+      phoneNumber: phoneNumber
+    };
+
+    // Send a PUT request to the server with the updated user data
+    await axios.put(`http://localhost:4000/signup/${id}`, updatedUser);
+
+    // Fetch and display the updated data
+    await fetchData();
+  } catch (error) {
+    console.error('Error updating data:', error);
+  }
+}
+
+// Fetch initial data when the page loads
+fetchData();
+  </script>
+</body>
+</html>

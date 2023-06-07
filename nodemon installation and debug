@@ -237,3 +237,37 @@ in main app , my main application is app.js
 var cors = require('cors')
 app.use(cors())
  /
+
+
+ some of sql commands
+ -------------------------
+
+
+ 
+to change direct from c to d
+type d:
+D:>
+and move login page file
+type D:\>cd D:\loginPage
+
+mysql -u root -p
+mysql> show databases;
+mysql> use Node-complete
+
+mysql> ALTER TABLE signups AUTO_INCREMENT = 1;    (this is only for increment if or 16 it increment 17)
+
+mysql>TRUNCATE TABLE signups; (this is start from 1 ,by deleting all id in backend)
+
+
+
+
+mysql> create table student(name varchar(50),rolnum int(10),brnach varchar(5));
+show databases;
+
+mysql> desc student;       ie(desc:description)
+mysql> INSERT INTO student VALUES ('JohnDoe', '1234567890', '23');
+
+mysql> insert into values('ram','3434','cs');
+
+mysql> Select name from student;
+

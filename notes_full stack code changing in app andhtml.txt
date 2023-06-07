@@ -1,0 +1,1237 @@
+
+// http://localhost:4000/admin/login
+
+before we are storing in crud crud store only hundered 
+https://crudcrud.com/Dashboard/5b3fdeeeb2aa4b46b74d78101303164c
+user
+so we are using cloudflare store 
+
+//<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
+
+code is changing app.js and signup.html  
+
+app.js
+--------------------
+const path = require('path');
+const express = require('express');
+const bodyParser = require('body-parser');
+const errorController = require('./controllers/error');
+const sequelize = require('./util/database');
+const fs = require('fs');
+const User = require('./models/user'); 
+const cors = require('cors');
+
+const app = express();
+
+app.use(cors());
+
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.static(path.join(__dirname, 'signupfolder')));
+
+app.get('/admin/login', (req, res) => {
+  console.log("URL: http://localhost:4000/admin/login is in ur app.js");
+  res.sendFile(path.join(__dirname, 'signupfolder', 'signup.html'));
+});
+app.post('/signup', (req, res) => {
+  const { username, password, phoneNumber } = req.body;
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error saving form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const id = signups.length + 1; // Calculate the next ID
+
+    const formData = {
+      id: id,
+      username: username,
+      password: password,
+      phoneNumber: phoneNumber
+    };
+
+    signups.push(formData);
+
+    fs.writeFile('details.json', JSON.stringify(signups), err => {
+      if (err) {
+        console.error('Error writing to details.json', err);
+        res.send('Error saving form data');
+      } else {
+        console.log('Form data saved in (app.js) to details.json');
+        res.status(200).json({
+          message: 'Form data saved successfully in(app.js)  ',
+          id:id,
+          username: username,
+          password: password,
+          phoneNumber: phoneNumber
+        });
+      }
+    });
+  });
+});
+
+
+
+app.get('/signup/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error fetching form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const entry = signups.find(entry => entry.id === id);
+
+    if (entry) {
+      res.send(entry);
+    } else {
+      res.send('Entry not found');
+    }
+  });
+});
+
+
+
+
+
+
+app.get('/signup/:page', (req, res) => {
+  const page = parseInt(req.params.page); // Current page number
+  const pageSize = 100; // Number of users to fetch per page
+
+  // Calculate the offset based on the page number and page size
+  const offset = (page - 1) * pageSize;
+
+  // Fetch users from the database using Sequelize
+  User.findAll({
+    offset: offset,
+    limit: pageSize,
+  })
+    .then((users) => {
+      // Modify the logic here to add edit and delete buttons to each user
+      const formattedUsers = users.map((user) => ({
+        id: user.id,
+        username: user.username,
+        password: user.password,
+        phoneNumber: user.phoneNumber,
+        editUrl: `/signup/edit/${user.id}`, // Edit button URL
+        deleteUrl: `/signup/delete/${user.id}`, // Delete button URL
+      }));
+
+      res.json(formattedUsers);
+    })
+    .catch((error) => {
+      console.error('Error fetching user data:', error);
+      res.status(500).json({ error: 'Error fetching user data' });
+    });
+});
+const adminRoutes = require('./routes/admin');
+app.use('/admin', adminRoutes);
+
+app.use(errorController.get404);
+
+sequelize
+  .sync()
+  .then(result => {
+    app.listen(4000, () => {
+      console.log('Server running on port 4000');
+    });
+  })
+  .catch(err => {
+    console.log(err);
+  });
+-------------------------------------------------------------
+
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Signup Form</title>
+  
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-actions {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Signup Form</h1>
+  <form action="http://localhost:4000/signup" id="signup-form" method="POST">
+    <label for="username">Username:</label>
+    <input type="text" id="username" name="username" required>
+    
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" required>
+    
+    <label for="phoneNumber">Phone Number:</label>
+    <input type="text" id="phoneNumber" name="phoneNumber" required>
+    
+    <button type="submit" onclick="signupData()">Sign Up</button>
+  </form>
+  
+  <div id="output"></div>
+  
+  <!-- Add delete and edit buttons -->
+  <button id="deleteButton" onclick="deleteData()" style="display: none;">Delete</button>
+  <button id="editButton" onclick="editData()" style="display: none;">Edit</button>
+
+   
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
+  <script>
+    async function fetchData() {
+      try {
+        const response = await axios.get('http://localhost:4000/signup-data');
+        const data = response.data;
+
+        console.log('Received data from the server:', data);
+
+        var output = '';
+        data.forEach((entry, index) => {
+          output += `
+            <div class="card">
+              <div class="card-content">
+                <h3>Username: ${entry.username}</h3>
+                <p>Password: ${entry.password}</p>
+                <p>Phone Number: ${entry.phoneNumber}</p>
+              </div>
+              <div class="card-actions">
+                <button class="edit-button" onclick="editData(${index})" style="display: none;">Edit</button>
+                <button class="delete-button" onclick="deleteData(${index})" style="display: none;">Delete</button>
+              </div>
+            </div>
+            <br>
+          `;
+        });
+
+        document.getElementById('output').innerHTML = output;
+
+        // Show the edit and delete buttons
+        var editButtons = document.getElementsByClassName('edit-button');
+        var deleteButtons = document.getElementsByClassName('delete-button');
+
+        for (var i = 0; i < editButtons.length; i++) {
+          editButtons[i].style.display = 'inline';
+        }
+
+        for (var i = 0; i < deleteButtons.length; i++) {
+          deleteButtons[i].style.display = 'inline';
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    }
+
+    async function signupData() {
+      try {
+        // Get the form input values
+        var username = document.getElementById('username').value;
+        var password = document.getElementById('password').value;
+        var phoneNumber = document.getElementById('phoneNumber').value;
+
+        // Fetch the existing data to determine the next ID
+        const response = await axios.get('http://localhost:4000/signup-data');
+        const data = response.data;
+        const id = data.length + 1;
+
+        // Create a new user entry
+        var newUser = {
+          id: id, // Assign the next available ID
+          username: username,
+          password: password,
+          phoneNumber: phoneNumber
+        }; 
+
+        // Send the new user data to the server
+        await axios.post('http://localhost:4000/signup', newUser);
+
+        // Fetch and display the updated data
+        await fetchData();
+      } catch (error) {
+        console.error('Error signing up:', error);
+      }
+    }
+  </script>
+</body>
+</html>
+
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+above code will redirect next page display adata
+same code above when click in submit with edit and delete button
+app.js
+-----
+
+const path = require('path');
+const express = require('express');
+const bodyParser = require('body-parser');
+const errorController = require('./controllers/error');
+const fs = require('fs');
+
+const app = express();
+
+app.use(bodyParser.json({ extended: false }));
+app.use(express.static(path.join(__dirname, 'signupfolder')));
+
+app.get('/admin/login', (req, res) => {
+  console.log("URL: http://localhost:4000/admin/login is in your app.js");
+  res.sendFile(path.join(__dirname, 'signupfolder', 'signup.html'));
+});
+
+app.get('/signup-data', (req, res) => {
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error fetching form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    res.json(signups);
+  });
+});
+
+app.post('/signup', (req, res) => {
+  const { username, password, phoneNumber } = req.body;
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error saving form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const id = signups.length + 1; // Calculate the next ID
+
+    const formData = {
+      id: id,
+      username: username,
+      password: password,
+      phoneNumber: phoneNumber
+    };
+
+    signups.push(formData);
+
+    fs.writeFile('details.json', JSON.stringify(signups), err => {
+      if (err) {
+        console.error('Error writing to details.json', err);
+        res.send('Error saving form data');
+      } else {
+        console.log('Form data saved in details.json');
+        res.status(200).json(formData); // Return the newly added form data
+      }
+    });
+  });
+});
+
+app.get('/signup/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error fetching form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const entry = signups.find(entry => entry.id === id);
+
+    if (entry) {
+      res.send(entry);
+    } else {
+      res.send('Entry not found');
+    }
+  });
+});
+
+app.delete('/signup/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error deleting form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const entryIndex = signups.findIndex(entry => entry.id === id);
+
+    if (entryIndex !== -1) {
+      signups.splice(entryIndex, 1);
+      fs.writeFile('details.json', JSON.stringify(signups), err => {
+        if (err) {
+          console.error('Error writing to details.json', err);
+          res.send('Error deleting form data');
+        } else {
+          console.log('Form data deleted from details.json');
+          res.status(200).json({ message: 'Form data deleted successfully' });
+        }
+      });
+    } else {
+      res.send('Entry not found');
+    }
+  });
+});
+
+app.put('/signup/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const { username, password, phoneNumber } = req.body;
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error updating form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const entryIndex = signups.findIndex(entry => entry.id === id);
+
+    if (entryIndex !== -1) {
+      const updatedEntry = {
+        id: id,
+        username: username,
+        password: password,
+        phoneNumber: phoneNumber
+      };
+
+      signups[entryIndex] = updatedEntry;
+      fs.writeFile('details.json', JSON.stringify(signups), err => {
+        if (err) {
+          console.error('Error writing to details.json', err);
+          res.send('Error updating form data');
+        } else {
+          console.log('Form data updated in details.json');
+          res.status(200).json(updatedEntry); // Return the updated form data
+        }
+      });
+    } else {
+      res.send('Entry not found');
+    }
+  });
+});
+
+app.use(errorController.get404);
+
+app.listen(4000, () => {
+  console.log('Server running on port 4000');
+});
+-----------------------------------------------------------------------------------------------------
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Signup Form</title>
+  <style>
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-actions {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Signup Form</h1>
+  <form id="signup-form">
+    <label for="username">Username:</label>
+    <input type="text" id="username" name="username" required>
+    
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" required>
+    
+    <label for="phoneNumber">Phone Number:</label>
+    <input type="text" id="phoneNumber" name="phoneNumber" required>
+    
+    <button type="submit" onclick="signupData(event)">Sign Up</button>
+  </form>
+  
+  <div id="output"></div>
+  
+  <!-- Add delete and edit buttons -->
+  <button id="deleteButton" onclick="deleteData()" style="display: none;">Delete</button>
+  <button id="editButton" onclick="editData()" style="display: none;">Edit</button>
+   
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
+  <script>
+    async function fetchData() {
+  try {
+    const response = await axios.get('http://localhost:4000/signup-data');
+    const data = response.data;
+
+    console.log('Received data from the server:', data);
+
+    var output = '';
+    data.forEach((entry, index) => {
+      output += `
+        <div class="card">
+          <div class="card-content">
+            <h3>Username: ${entry.username}</h3>
+            <p>Password: ${entry.password}</p>
+            <p>Phone Number: ${entry.phoneNumber}</p>
+          </div>
+          <div class="card-actions">
+            <button class="edit-button" onclick="editData(${entry.id})">Edit</button>
+            <button class="delete-button" onclick="deleteData(${entry.id})">Delete</button>
+          </div>
+        </div>
+        <br>
+      `;
+    });
+
+    document.getElementById('output').innerHTML = output;
+  } catch (error) {
+    console.error('Error fetching data:', error);
+  }
+}
+
+document.getElementById('signup-form').addEventListener('submit', signupData);
+
+async function signupData(event) {
+  event.preventDefault(); // Prevent form submission
+
+  try {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const phoneNumber = document.getElementById('phoneNumber').value;
+
+    const newUser = {
+      username: username,
+      password: password,
+      phoneNumber: phoneNumber
+    };
+
+    const response = await axios.post('http://localhost:4000/signup', newUser);
+    const responseData = response.data;
+
+    console.log('Received response:', responseData);
+
+    // Clear form fields after successful submission
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    document.getElementById('phoneNumber').value = '';
+
+    await fetchData(); // Fetch and display the updated data
+  } catch (error) {
+    console.error('Error signing up:', error);
+  }
+}
+
+async function deleteData(id) {
+  try {
+    // Send a DELETE request to the server for the specified user ID
+    await axios.delete(`http://localhost:4000/signup/${id}`);
+
+    // Fetch and display the updated data
+    await fetchData();
+  } catch (error) {
+    console.error('Error deleting data:', error);
+  }
+}
+
+async function editData(id) {
+  try {
+    const username = prompt('Enter the new username:');
+    const password = prompt('Enter the new password:');
+    const phoneNumber = prompt('Enter the new phone number:');
+
+    // Create an object with the updated user data
+    const updatedUser = {
+      username: username,
+      password: password,
+      phoneNumber: phoneNumber
+    };
+
+    // Send a PUT request to the server with the updated user data
+    await axios.put(`http://localhost:4000/signup/${id}`, updatedUser);
+
+    // Fetch and display the updated data
+    await fetchData();
+  } catch (error) {
+    console.error('Error updating data:', error);
+  }
+}
+
+// Fetch initial data when the page loads
+fetchData();
+  </script>
+</body>
+</html>
+----------------------------------------------------------------------------------------------------------------------------------
+app.js
+this code u paste it will hit backend to store data
+const path = require('path');
+const express = require('express');
+const bodyParser = require('body-parser');
+const errorController = require('./controllers/error');
+const fs = require('fs');
+const sequelize = require('./util/database'); // Import the Sequelize instance
+const User = require('./models/User');
+
+const app = express();
+
+app.use(bodyParser.json({ extended: false }));
+app.use(express.static(path.join(__dirname, 'signupfolder')));
+
+app.get('/admin/login', (req, res) => {
+  console.log("URL: http://localhost:4000/admin/login is in your app.js");
+  res.sendFile(path.join(__dirname, 'signupfolder', 'signup.html'));
+});
+
+app.get('/signup-data', (req, res) => {
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error fetching form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    res.json(signups);
+  });
+});
+
+app.post('/signup', async (req, res) => {
+  const { username, password, phoneNumber } = req.body;
+
+  try {
+    // Create a new user using the User model
+    const newUser = await User.create({
+      username: username,
+      password: password,
+      phoneNumber: phoneNumber
+    });
+
+    console.log('New user created:', newUser);
+
+    res.status(200).json(newUser); // Return the newly created user
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).send('Error creating user');
+  }
+});
+
+app.get('/signup/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error fetching form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const entry = signups.find(entry => entry.id === id);
+
+    if (entry) {
+      res.send(entry);
+    } else {
+      res.send('Entry not found');
+    }
+  });
+});
+
+app.delete('/signup/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error deleting form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const entryIndex = signups.findIndex(entry => entry.id === id);
+
+    if (entryIndex !== -1) {
+      signups.splice(entryIndex, 1);
+      fs.writeFile('details.json', JSON.stringify(signups), err => {
+        if (err) {
+          console.error('Error writing to details.json', err);
+          res.send('Error deleting form data');
+        } else {
+          console.log('Form data deleted from details.json');
+          res.status(200).json({ message: 'Form data deleted successfully' });
+        }
+      });
+    } else {
+      res.send('Entry not found');
+    }
+  });
+});
+
+app.put('/signup/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const { username, password, phoneNumber } = req.body;
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error updating form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const entryIndex = signups.findIndex(entry => entry.id === id);
+
+    if (entryIndex !== -1) {
+      const updatedEntry = {
+        id: id,
+        username: username,
+        password: password,
+        phoneNumber: phoneNumber
+      };
+
+      signups[entryIndex] = updatedEntry;
+      fs.writeFile('details.json', JSON.stringify(signups), err => {
+        if (err) {
+          console.error('Error writing to details.json', err);
+          res.send('Error updating form data');
+        } else {
+          console.log('Form data updated in details.json');
+          res.status(200).json(updatedEntry); // Return the updated form data
+        }
+      });
+    } else {
+      res.send('Entry not found');
+    }
+  });
+});
+
+app.use(errorController.get404);
+
+app.listen(4000, () => {
+  console.log('Server running on port 4000');
+});
+
+module.exports = app;
+
+
+----------------------------------------------------------------------------------------------------
+diplaying both for fontend backend
+but delete button not working and data enterd is reciving (details.json also and backend also)
+
+
+
+
+
+const path = require('path');
+const express = require('express');
+const bodyParser = require('body-parser');
+const errorController = require('./controllers/error');
+const fs = require('fs');
+const sequelize = require('./util/database'); // Import the Sequelize instance
+const User = require('./models/User');
+
+const app = express();
+
+app.use(bodyParser.json({ extended: false }));
+app.use(express.static(path.join(__dirname, 'signupfolder')));
+
+// Set up Sequelize models and sync with the database
+sequelize.sync()
+  .then(() => {
+    console.log('MySQL database synced');
+  })
+  .catch(error => {
+    console.error('Error syncing MySQL database:', error);
+  });
+
+app.get('/admin/login', (req, res) => {
+  console.log("URL: http://localhost:4000/admin/login is in your app.js");
+  res.sendFile(path.join(__dirname, 'signupfolder', 'signup.html'));
+});
+
+app.get('/signup-data', async (req, res) => {
+  try {
+    // Retrieve all users from the MySQL database
+    const users = await User.findAll();
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).send('Error fetching users');
+  }
+});
+
+app.post('/signup', async (req, res) => {
+  const { username, password, phoneNumber } = req.body;
+
+  try {
+    // Create a new user using the User model in Sequelize
+    const newUser = await User.create({
+      username: username,
+      password: password,
+      phoneNumber: phoneNumber
+    });
+
+    // Save the user to the MySQL database
+    await newUser.save();
+
+    // Save the user to the details.json file
+    fs.readFile('details.json', 'utf8', (err, data) => {
+      if (err) {
+        console.error('Error reading details.json:', err);
+        res.send('Error creating user');
+        return;
+      }
+
+      let signups = [];
+      if (data) {
+        signups = JSON.parse(data);
+      }
+
+      signups.push(newUser);
+
+      fs.writeFile('details.json', JSON.stringify(signups), err => {
+        if (err) {
+          console.error('Error writing to details.json', err);
+          res.send('Error creating user');
+        } else {
+          console.log('User data saved to details.json');
+          res.status(200).json(newUser);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).send('Error creating user');
+  }
+});
+
+app.get('/signup/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error fetching form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const entry = signups.find(entry => entry.id === id);
+
+    if (entry) {
+      res.send(entry);
+    } else {
+      res.send('Entry not found');
+    }
+  });
+});
+
+app.delete('/signup/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error deleting form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const entryIndex = signups.findIndex(entry => entry.id === id);
+
+    if (entryIndex !== -1) {
+      signups.splice(entryIndex, 1);
+      fs.writeFile('details.json', JSON.stringify(signups), err => {
+        if (err) {
+          console.error('Error writing to details.json', err);
+          res.send('Error deleting form data');
+        } else {
+          console.log('Form data deleted from details.json');
+          res.status(200).json({ message: 'Form data deleted successfully' });
+        }
+      });
+    } else {
+      res.send('Entry not found');
+    }
+  });
+});
+
+app.put('/signup/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const { username, password, phoneNumber } = req.body;
+
+  fs.readFile('details.json', 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading details.json:', err);
+      res.send('Error updating form data');
+      return;
+    }
+
+    let signups = [];
+    if (data) {
+      signups = JSON.parse(data);
+    }
+
+    const entryIndex = signups.findIndex(entry => entry.id === id);
+
+    if (entryIndex !== -1) {
+      const updatedEntry = {
+        id: id,
+        username: username,
+        password: password,
+        phoneNumber: phoneNumber
+      };
+
+      signups[entryIndex] = updatedEntry;
+      fs.writeFile('details.json', JSON.stringify(signups), err => {
+        if (err) {
+          console.error('Error writing to details.json', err);
+          res.send('Error updating form data');
+        } else {
+          console.log('Form data updated in details.json');
+          res.status(200).json(updatedEntry); // Return the updated form data
+        }
+      });
+    } else {
+      res.send('Entry not found');
+    }
+  });
+});
+
+app.use(errorController.get404);
+
+app.listen(4000, () => {
+  console.log('Server running on port 4000');
+});
+
+---------------------------------------------------------------------------------------------
+
+
+
+
+
+this code display ind buttons and storing in backend
+
+const path = require('path');
+const express = require('express');
+const bodyParser = require('body-parser');
+const errorController = require('./controllers/error');
+const sequelize = require('./util/database'); // Import the Sequelize instance
+const User = require('./models/User');
+
+const app = express();
+
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, 'signupfolder')));
+
+// Set up Sequelize models and sync with the database
+sequelize
+  .sync()
+  .then(() => {
+    console.log('MySQL database synced');
+  })
+  .catch((error) => {
+    console.error('Error syncing MySQL database:', error);
+  });
+
+app.get('/admin/login', (req, res) => {
+  console.log("URL: http://localhost:4000/admin/login is in your app.js");
+  res.sendFile(path.join(__dirname, 'signupfolder', 'signup.html'));
+});
+
+
+//fetch data one by one from database
+//http://localhost:4000/signup/1...n
+app.get('/signup/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  try {
+    const user = await User.findByPk(id);
+
+    if (user) {
+      res.json(user);
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).send('Error fetching user');
+  }
+});
+
+
+
+
+
+//fetch from database all data
+//http://localhost:4000/signup-data
+
+
+app.get('/signup-data', async (req, res) => {
+  try {
+    const users = await User.findAll();
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).send('Error fetching users');
+  }
+});
+
+app.post('/signup', async (req, res) => {
+  const { username, password, phoneNumber } = req.body;
+
+  try {
+    const newUser = await User.create({
+      username: username,
+      password: password,
+      phoneNumber: phoneNumber,
+    });
+
+    res.status(200).json(newUser);
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).send('Error creating user');
+  }
+});
+
+
+
+
+//data is deleted in backend
+app.delete('/signup/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  try {
+    const deletedUser = await User.destroy({ where: { id: id } });
+
+    if (deletedUser) {
+      res.status(200).json({ message: 'User deleted successfully' });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).send('Error deleting user');
+  }
+});
+
+app.use(errorController.get404);
+
+app.listen(4000, () => {
+  console.log('Server running on port 4000');
+});
+
+
+
+
+
+
+
+signup.html
+-------------
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Signup Form</title>
+  <style>
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-actions {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Signup Form</h1>
+  <form id="signup-form">
+    <label for="username">Username:</label>
+    <input type="text" id="username" name="username" required>
+    
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" required>
+    
+    <label for="phoneNumber">Phone Number:</label>
+    <input type="text" id="phoneNumber" name="phoneNumber" required>
+    
+    <button type="submit">Sign Up</button>
+  </form>
+  
+  <div id="output"></div>
+  
+  //if u block div tag <div id="output"></div> will not display on data after submiting button  //
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
+  <script>
+    async function fetchData() {
+  try {
+    const response = await axios.get('http://localhost:4000/signup-data');
+    const data = response.data;
+
+    console.log('Received data from the server:', data);
+
+    var output = '';
+    data.forEach((entry, index) => {
+      output += `
+        <div class="card">
+          <div class="card-content">
+            <h3>Username: ${entry.username}</h3>
+            <p>Password: ${entry.password}</p>
+            <p>Phone Number: ${entry.phoneNumber}</p>
+          </div>
+          <div class="card-actions">
+            <button class="edit-button" onclick="editData(${entry.id})">Edit</button>
+            <button class="delete-button" onclick="deleteData(${entry.id})">Delete</button>
+          </div>
+        </div>
+        <br>
+      `;
+    });
+
+    document.getElementById('output').innerHTML = output;
+  } catch (error) {
+    console.error('Error fetching data:', error);
+  }
+}
+
+document.getElementById('signup-form').addEventListener('submit', signupData);
+
+async function signupData(event) {
+  event.preventDefault(); // Prevent form submission
+
+  try {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const phoneNumber = document.getElementById('phoneNumber').value;
+
+    const newUser = {
+      username: username,
+      password: password,
+      phoneNumber: phoneNumber
+    };
+
+    const response = await axios.post('http://localhost:4000/signup', newUser);
+    const responseData = response.data;
+
+    console.log('Received response:', responseData);
+
+    // Clear form fields after successful submission
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    document.getElementById('phoneNumber').value = '';
+
+    await fetchData(); // Fetch and display the updated data
+  } catch (error) {
+    console.error('Error signing up:', error);
+  }
+}
+async function deleteData(id) {
+  try {
+    // Send a DELETE request to the server for the specified user ID
+    await axios.delete(`http://localhost:4000/signup/${id}`);
+
+    // Fetch and display the updated data
+    await fetchData();
+  } catch (error) {
+    console.error('Error deleting data:', error);
+  }
+}
+
+async function editData(id) {
+  try {
+    const username = prompt('Enter the new username:');
+    const password = prompt('Enter the new password:');
+    const phoneNumber = prompt('Enter the new phone number:');
+
+    // Create an object with the updated user data
+    const updatedUser = {
+      username: username,
+      password: password,
+      phoneNumber: phoneNumber
+    };
+
+    // Send a PUT request to the server with the updated user data
+    await axios.put(`http://localhost:4000/signup/${id}`, updatedUser);
+
+    // Fetch and display the updated data
+    await fetchData();
+  } catch (error) {
+    console.error('Error updating data:', error);
+  }
+}
+
+// Fetch initial data when the page loads
+fetchData();
+  </script>
+</body>
+</html>
